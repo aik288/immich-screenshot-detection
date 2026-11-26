@@ -5,7 +5,7 @@ FROM python:3.13
 WORKDIR /app
 
 # Install system dependencies for OpenCV
-RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libglib2.0-0 libgtk-3-0 libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev libatlas-base-dev python3-dev
+RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libglib2.0-0 libgtk-3-0 libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev libopenblas-dev python3-dev
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
