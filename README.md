@@ -37,12 +37,12 @@ The application uses several sophisticated techniques to identify screenshots:
 3. Create a new API key
 4. Copy the API key for configuration
 
-### 2. Get Your User ID
+### 2. (Optional) Get Your User ID
 
-You can find your User ID in the Immich web interface URL or by using the API:
+The API key already identifies the user, so `IMMICH_USER_ID` is optional. If you want it, you can read it from the API:
 
 ```bash
-curl -H "x-api-key: YOUR_API_KEY" http://your-immich-server:3001/api/users/me
+curl -H "x-api-key: YOUR_API_KEY" http://your-immich-server:2283/api/users/me
 ```
 
 ### 3. Configuration
@@ -58,10 +58,10 @@ curl -H "x-api-key: YOUR_API_KEY" http://your-immich-server:3001/api/users/me
     ```env
     # Required settings
     IMMICH_API_KEY=your-immich-api-key-here
-    IMMICH_USER_ID=your-user-id-here
-    IMMICH_SERVER_URL=http://your-immich-server:3001
+    IMMICH_SERVER_URL=http://your-immich-server:2283
 
     # Optional settings
+    IMMICH_USER_ID=your-user-id-here
     SCREENSHOT_CONFIDENCE_THRESHOLD=0.7
     BATCH_SIZE=10
     SCREENSHOT_TAG=screenshot
@@ -71,58 +71,55 @@ curl -H "x-api-key: YOUR_API_KEY" http://your-immich-server:3001/api/users/me
 
 ### 4. Running with Docker Compose
 
-#### Option A: Add to Existing Immich Setup
+The included `docker-compose.yml` runs only the categorizer and expects an existing Immich stack on an external Docker network.
 
-Add this service to your existing Immich docker-compose.yml:
+1. Find the network used by your Immich containers:
+
+    ```bash
+    docker network ls
+    ```
+
+2. Set `IMMICH_NETWORK` in `.env` (for example `immich_default`).
+
+3. Build and run the one-shot job:
+
+    ```bash
+    docker compose up --build
+    ```
+
+The container exits when the scan finishes.
+
+#### Adding to an existing Immich compose file
+
+Add this service to the compose file that already runs Immich, using the same network:
 
 ```yaml
 services:
     immich-screenshot-categorizer:
-        build: https://github.com/your-repo/immich-screenshot-categorizer.git
+        build: .
         container_name: immich-screenshot-categorizer
-        restart: unless-stopped
-        depends_on:
-            - immich-server
+        restart: "no"
         networks:
-            - immich-network
+            - immich
+        env_file:
+            - .env
         environment:
-            IMMICH_SERVER_URL: http://immich-server:3001
-            IMMICH_API_KEY: ${IMMICH_API_KEY}
-            IMMICH_USER_ID: ${IMMICH_USER_ID}
-            SCREENSHOT_CONFIDENCE_THRESHOLD: ${SCREENSHOT_CONFIDENCE_THRESHOLD:-0.7}
-            BATCH_SIZE: ${BATCH_SIZE:-10}
-            SCREENSHOT_TAG: ${SCREENSHOT_TAG:-screenshot}
-            CREATE_ALBUM: ${CREATE_ALBUM:-true}
-            ALBUM_NAME: ${ALBUM_NAME:-Screenshots}
+            IMMICH_SERVER_URL: http://immich-server:2283
         volumes:
             - ./logs:/app/logs
 ```
 
-#### Option B: Standalone with Full Immich Stack
-
-```bash
-# Clone the repository
-git clone https://github.com/your-repo/immich-screenshot-categorizer.git
-cd immich-screenshot-categorizer
-
-# Configure environment
-cp config.env.example .env
-# Edit .env with your settings
-
-# Start the full stack
-docker-compose up -d
-```
-
 ### 5. Running as One-Shot Container
 
-If you prefer to run the categorizer as a one-time job:
+If you prefer to run the categorizer without Compose:
 
 ```bash
+docker build -t immich-screenshot-categorizer .
+
 docker run --rm \
-  -e IMMICH_API_KEY=your-api-key \
-  -e IMMICH_USER_ID=your-user-id \
-  -e IMMICH_SERVER_URL=http://your-immich-server:3001 \
-  --network immich-network \
+  --env-file .env \
+  --network immich_default \
+  -v "$(pwd)/logs:/app/logs" \
   immich-screenshot-categorizer
 ```
 
@@ -131,8 +128,8 @@ docker run --rm \
 | Variable                          | Default                 | Description                                             |
 | --------------------------------- | ----------------------- | ------------------------------------------------------- |
 | `IMMICH_API_KEY`                  | _required_              | Your Immich API key                                     |
-| `IMMICH_USER_ID`                  | _required_              | Your Immich user ID                                     |
-| `IMMICH_SERVER_URL`               | `http://localhost:3001` | Immich server URL                                       |
+| `IMMICH_USER_ID`                  | _optional_              | Your Immich user ID (the API key already identifies you) |
+| `IMMICH_SERVER_URL`               | `http://localhost:2283` | Immich server URL (the client appends `/api`)           |
 | `SCREENSHOT_CONFIDENCE_THRESHOLD` | `0.7`                   | Confidence threshold for screenshot detection (0.0-1.0) |
 | `BATCH_SIZE`                      | `10`                    | Number of photos to process in each batch               |
 | `MAX_IMAGE_SIZE`                  | `2048`                  | Maximum image size for processing (pixels)              |
@@ -148,18 +145,17 @@ docker run --rm \
 View logs in real-time:
 
 ```bash
-docker-compose logs -f immich-screenshot-categorizer
+docker compose logs -f immich-screenshot-categorizer
 ```
 
-### Health Check
+### Job Status
 
-Check if the service is running:
+This is a one-shot batch job, so it does not expose a long-running health check. Inspect the exit code and logs:
 
 ```bash
-docker-compose ps
+docker compose ps
+docker compose logs immich-screenshot-categorizer
 ```
-
-The application includes health checks to ensure it's running properly.
 
 ## Troubleshooting
 
@@ -177,8 +173,8 @@ The application includes health checks to ensure it's running properly.
 
 3. **Permission Errors**
 
-    - Ensure the API key has read/write permissions for assets
-    - Check that the user ID is correct
+    - Ensure the API key has read/write permissions for assets and tags
+    - Check that the API key belongs to the user that owns the assets
 
 4. **High Memory Usage**
     - Reduce `BATCH_SIZE` for lower memory usage
@@ -189,7 +185,7 @@ The application includes health checks to ensure it's running properly.
 Enable debug logging:
 
 ```bash
-docker-compose up -d -e LOG_LEVEL=DEBUG
+LOG_LEVEL=DEBUG docker compose up --build
 ```
 
 ## Architecture

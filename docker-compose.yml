@@ -1,88 +1,21 @@
-version: "3.8"
-
 services:
     immich-screenshot-categorizer:
         build: .
         container_name: immich-screenshot-categorizer
-        restart: unless-stopped
-        depends_on:
-            - immich-server
-        networks:
-            - immich-network
+        # This is a one-shot batch job, so it should not restart on success.
+        restart: "no"
+        env_file:
+            - .env
         environment:
-            # Immich connection settings
-            IMMICH_SERVER_URL: http://immich-server:3001
-            IMMICH_API_KEY: ${IMMICH_API_KEY}
-            IMMICH_USER_ID: ${IMMICH_USER_ID}
-
-            # Screenshot detection settings
-            SCREENSHOT_CONFIDENCE_THRESHOLD: ${SCREENSHOT_CONFIDENCE_THRESHOLD:-0.7}
-            BATCH_SIZE: ${BATCH_SIZE:-10}
-            MAX_IMAGE_SIZE: ${MAX_IMAGE_SIZE:-2048}
-
-            # Logging settings
-            LOG_LEVEL: ${LOG_LEVEL:-INFO}
-
-            # Tag and album settings
-            SCREENSHOT_TAG: ${SCREENSHOT_TAG:-screenshot}
-            CREATE_ALBUM: ${CREATE_ALBUM:-true}
-            ALBUM_NAME: ${ALBUM_NAME:-Screenshots}
+            # Override in .env if your Immich service has a different name/port.
+            IMMICH_SERVER_URL: ${IMMICH_SERVER_URL:-http://immich-server:2283}
         volumes:
             - ./logs:/app/logs
-        healthcheck:
-            test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-            start_period: 10s
-
-    # Example Immich server configuration
-    # Note: This is a simplified example. In practice, you would use
-    # the official Immich docker-compose.yml file
-    immich-server:
-        image: ghcr.io/immich-app/immich-server:release
-        container_name: immich-server
-        restart: unless-stopped
-        ports:
-            - "3001:3001"
         networks:
-            - immich-network
-        environment:
-            DB_HOSTNAME: immich-database
-            DB_USERNAME: ${DB_USERNAME}
-            DB_PASSWORD: ${DB_PASSWORD}
-            DB_DATABASE_NAME: ${DB_DATABASE_NAME}
-            REDIS_HOSTNAME: immich-redis
-        volumes:
-            - ${UPLOAD_LOCATION}:/usr/src/app/upload
-            - /etc/localtime:/etc/localtime:ro
-        depends_on:
-            - immich-database
-            - immich-redis
-
-    immich-database:
-        image: tensorchord/pgvecto-rs:pg14-v0.2.0
-        container_name: immich-database
-        restart: unless-stopped
-        networks:
-            - immich-network
-        environment:
-            POSTGRES_PASSWORD: ${DB_PASSWORD}
-            POSTGRES_USER: ${DB_USERNAME}
-            POSTGRES_DB: ${DB_DATABASE_NAME}
-        volumes:
-            - pgdata:/var/lib/postgresql/data
-
-    immich-redis:
-        image: redis:6.2-alpine
-        container_name: immich-redis
-        restart: unless-stopped
-        networks:
-            - immich-network
+            - immich
 
 networks:
-    immich-network:
-        driver: bridge
-
-volumes:
-    pgdata:
+    immich:
+        external: true
+        # Name of your existing Immich network, e.g. from Immich's compose file.
+        name: ${IMMICH_NETWORK:-immich_default}

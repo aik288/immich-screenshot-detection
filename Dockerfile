@@ -1,30 +1,28 @@
-# Use Python 3.11 slim image for smaller size
-FROM python:3.13
+# Use a slim Python image; OpenCV headless avoids the GUI dependencies.
+FROM python:3.11-slim
 
-# Set working directory
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-# Install system dependencies for OpenCV
-RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libglib2.0-0 libgtk-3-0 libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev libopenblas-dev python3-dev
+# Runtime libraries needed by OpenCV headless.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Install Python dependencies first to leverage layer caching.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code.
+COPY main.py ./
+COPY src ./src
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
+# Run as a non-root user.
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
 USER app
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
-
-# Default command
 CMD ["python", "main.py"]

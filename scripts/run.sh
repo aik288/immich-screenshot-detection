@@ -62,20 +62,21 @@ run_application() {
     source .env
 
     # Check required variables
-    if [ -z "$IMMICH_API_KEY" ] || [ -z "$IMMICH_USER_ID" ]; then
-        print_error "Required environment variables not set. Please check your .env file."
+    if [ -z "$IMMICH_API_KEY" ]; then
+        print_error "IMMICH_API_KEY is not set. Please check your .env file."
         exit 1
     fi
 
     # Run the container
     docker run --rm \
         --env-file .env \
+        --network "${IMMICH_NETWORK:-immich_default}" \
         --name immich-screenshot-categorizer \
         -v "$(pwd)/logs:/app/logs" \
         immich-screenshot-categorizer
 }
 
-# Function to run with docker-compose
+# Function to run with Docker Compose
 run_compose() {
     print_status "Running with Docker Compose..."
 
@@ -84,23 +85,23 @@ run_compose() {
         exit 1
     fi
 
-    docker-compose up -d
-    print_status "Service started. Use 'docker-compose logs -f' to view logs."
+    docker compose up --build
+    print_status "Service finished. Use 'docker compose logs' to view logs."
 }
 
-# Function to stop docker-compose services
+# Function to stop Docker Compose services
 stop_compose() {
     print_status "Stopping Docker Compose services..."
-    docker-compose down
+    docker compose down
     print_status "Services stopped."
 }
 
 # Function to view logs
 view_logs() {
-    if docker-compose ps | grep -q immich-screenshot-categorizer; then
-        docker-compose logs -f immich-screenshot-categorizer
+    if docker compose ps | grep -q immich-screenshot-categorizer; then
+        docker compose logs -f immich-screenshot-categorizer
     else
-        print_error "Service not running with docker-compose."
+        print_error "Service not running with Docker Compose."
         exit 1
     fi
 }
@@ -112,7 +113,7 @@ run_tests() {
         -v "$(pwd):/app" \
         -w /app \
         python:3.11-slim \
-        bash -c "pip install -r requirements.txt && python -m pytest tests/ -v"
+        bash -c "pip install -r requirements.txt && python -m unittest discover -s tests -v"
 }
 
 # Function to show help
@@ -124,8 +125,8 @@ show_help() {
     echo "Commands:"
     echo "  build          Build the Docker image"
     echo "  run            Run the application once"
-    echo "  start          Start services with docker-compose"
-    echo "  stop           Stop docker-compose services"
+    echo "  start          Start services with Docker Compose"
+    echo "  stop           Stop Docker Compose services"
     echo "  logs           View logs from running service"
     echo "  test           Run tests"
     echo "  help           Show this help message"
@@ -133,7 +134,7 @@ show_help() {
     echo "Examples:"
     echo "  $0 build       # Build the Docker image"
     echo "  $0 run         # Run the application once"
-    echo "  $0 start       # Start with docker-compose"
+    echo "  $0 start       # Start with Docker Compose"
     echo "  $0 logs        # View logs"
     echo ""
 }

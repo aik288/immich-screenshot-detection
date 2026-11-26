@@ -1,41 +1,26 @@
 #!/usr/bin/env python3
-import os
-from immich_client import Configuration, ApiClient
-from immich_client.api import authentication_api, assets_api, albums_api
+"""Minimal example of using the Immich client directly."""
+
+import asyncio
+
+from src.config import Config
+from src.immich_client import ImmichClient
 
 
-def main():
-    # Configure API client
-    config = Configuration(
-        host="http://localhost:2283/api",  # Replace with your Immich server URL
-        api_key={
-            "api_key": os.getenv("IMMICH_API_KEY")
-        },  # Set your API key in environment
-    )
+async def main():
+    config = Config()
 
-    # Create API client instance
-    with ApiClient(config) as api_client:
-        # Initialize API endpoints
-        auth_api = authentication_api.AuthenticationApi(api_client)
-        assets_api = assets_api.AssetsApi(api_client)
-        albums_api = albums_api.AlbumsApi(api_client)
+    async with ImmichClient(config) as client:
+        photos = await client.get_all_photos()
+        print(f"Found {len(photos)} image assets")
 
-        try:
-            # Example: Get server status
-            status = auth_api.get_auth_status()
-            print("Server status:", status)
+        for photo in photos[:5]:
+            print(f"  {photo.get('originalFileName', 'Unknown')} ({photo['id']})")
 
-            # Example: Get all assets
-            assets = assets_api.get_all_assets()
-            print(f"Found {len(assets)} assets")
-
-            # Example: Get all albums
-            albums = albums_api.get_all_albums()
-            print(f"Found {len(albums)} albums")
-
-        except Exception as e:
-            print(f"Error accessing API: {e}")
+        if photos:
+            data = await client.download_photo(photos[0]["id"])
+            print(f"Downloaded {len(data)} bytes for the first asset")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

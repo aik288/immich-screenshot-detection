@@ -2,14 +2,15 @@
 Screenshot Detection Module using computer vision and heuristics
 """
 
+import asyncio
+import logging
+from io import BytesIO
+from typing import Dict
+
 import cv2
 import numpy as np
-import logging
-from typing import Tuple, List, Dict, Any
-from io import BytesIO
-from PIL import Image, ExifTags
-import asyncio
 import pillow_heif
+from PIL import ExifTags, Image
 
 # Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
@@ -38,6 +39,10 @@ class ScreenshotDetector:
         if not image_data:
             return False
 
+        # OpenCV/Pillow work is CPU-bound; keep it off the event loop.
+        return await asyncio.to_thread(self._is_screenshot_sync, image_data)
+
+    def _is_screenshot_sync(self, image_data: bytes) -> bool:
         try:
             # Load image
             image_io = BytesIO(image_data)
@@ -69,7 +74,6 @@ class ScreenshotDetector:
                 except Exception as e:
                     logger.error(f"Failed to resize image: {str(e)}")
                     # Continue with original size if resize fails
-                    pass
 
             try:
                 # Convert to numpy array for OpenCV
@@ -79,7 +83,7 @@ class ScreenshotDetector:
                 return False
 
             # Run detection methods
-            scores = await self._run_detection_methods(cv_image, image)
+            scores = self._run_detection_methods(cv_image, image)
 
             # Calculate weighted confidence score
             final_score = self._calculate_final_score(scores)
@@ -93,7 +97,7 @@ class ScreenshotDetector:
             logger.error(f"Error in screenshot detection: {str(e)}")
             return False
 
-    async def _run_detection_methods(
+    def _run_detection_methods(
         self, cv_image: np.ndarray, pil_image: Image.Image
     ) -> Dict[str, float]:
         """Run all detection methods and return individual scores"""
@@ -198,7 +202,7 @@ class ScreenshotDetector:
             # Filter contours that look like text
             text_contours = []
             for contour in contours:
-                x, y, w, h = cv2.boundingRect(contour)
+                _x, _y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = w / h if h > 0 else 0
                 area = cv2.contourArea(contour)
 
@@ -292,9 +296,10 @@ class ScreenshotDetector:
     def _analyze_metadata(self, image: Image.Image) -> float:
         """Analyze EXIF metadata for screenshot indicators"""
         try:
-            exif_data = image._getexif()
+            exif_data = image.getexif()
             if not exif_data:
-                return 0.0
+                # Screenshots usually have no camera EXIF data at all.
+                return 0.5
 
             # Convert EXIF data to readable format
             exif = {}
