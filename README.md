@@ -1,3 +1,7 @@
+This fork has been archived as it DOES NOT WORK. Nither did the original Repo and im not willing to spend time on this as i have better priorities
+My modifications to the repo were generated soly by AI
+This fork has been cinsiderd, Abandoned
+
 # Immich Screenshot Categorizer
 
 A dockerized application that automatically identifies and categorizes screenshots in your Immich photo library using advanced computer vision techniques.
